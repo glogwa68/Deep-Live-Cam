@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Deep Live Cam</string>
+    <string name="select_source">Select Source Face</string>
+    <string name="select_target">Select Target Image</string>
+    <string name="start_swap">Start Face Swap</string>
+    <string name="live_mode">Live Camera</string>
+    <string name="save_result">Save Result</string>
+    <string name="clear">Clear</string>
+    <string name="processing">Processing...</string>
+    <string name="no_source_face">Please select a source face first</string>
+    <string name="no_target_image">Please select a target image</string>
+    <string name="no_face_detected">No face detected in the image</string>
+    <string name="swap_success">Face swap completed!</string>
+    <string name="save_success">Image saved to gallery</string>
+    <string name="save_error">Failed to save image</string>
+    <string name="models_missing">ML models are missing</string>
+    <string name="models_missing_message">Please download the required models and place them in the app\'s models directory.\n\nRequired models:\n- inswapper_128.onnx\n- w600k_r50.onnx</string>
+    <string name="download_models">Download Models</string>
+    <string name="swap_all_faces">Swap All Faces</string>
+    <string name="source_face">Source Face</string>
+    <string name="target_image">Target Image</string>
+    <string name="result">Result</string>
+    <string name="camera_permission_required">Camera permission is required for live mode</string>
+    <string name="take_photo">Take Photo</string>
+    <string name="switch_camera">Switch Camera</string>
+    <string name="about">About</string>
+    <string name="about_text">Deep Live Cam - Offline Face Swap\nVersion 1.0.0\n\nThis app performs face swapping using AI models running entirely on your device. No internet connection required.\n\nUse responsibly and ethically.</string>
+    <string name="setup_instructions">Setup Instructions</string>
+    <string name="ok">OK</string>
+    <string name="part_swap_mode">Part Swap (Any Region)</string>
+    <string name="part_swap_description">Swap any body part or overlay any image onto a target region</string>
+</resources>

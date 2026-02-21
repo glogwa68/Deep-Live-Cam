@@ -30,4 +30,8 @@
     <string name="ok">OK</string>
     <string name="part_swap_mode">Part Swap (Any Region)</string>
     <string name="part_swap_description">Swap any body part or overlay any image onto a target region</string>
+    <string name="downloading_models">Downloading AI Models...</string>
+    <string name="download_complete">Models downloaded. Ready!</string>
+    <string name="download_failed">Download failed. Tap to retry.</string>
+    <string name="first_launch_info">First launch: downloading AI models (~725 MB). This is a one-time download.</string>
 </resources>

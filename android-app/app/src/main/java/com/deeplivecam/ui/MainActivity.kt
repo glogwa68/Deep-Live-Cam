@@ -9,12 +9,12 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.deeplivecam.R
 import com.deeplivecam.databinding.ActivityMainBinding
+import com.deeplivecam.ml.ModelDownloader
 import com.deeplivecam.ml.ModelManager
 import com.deeplivecam.processing.FaceSwapPipeline
 import com.deeplivecam.utils.BitmapUtils
@@ -31,8 +31,8 @@ class MainActivity : AppCompatActivity() {
     private var targetBitmap: Bitmap? = null
     private var resultBitmap: Bitmap? = null
     private var isProcessing = false
+    private var isDownloading = false
 
-    // Image picker launchers
     private val sourceImagePicker = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setupClickListeners()
-        checkModels()
+        checkAndDownloadModels()
     }
 
     private fun setupClickListeners() {
@@ -79,7 +79,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.liveModeButton.setOnClickListener {
             if (!ModelManager.areAllModelsAvailable(this)) {
-                showModelSetupDialog()
+                Toast.makeText(this, "Models are still downloading...", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             requestCameraPermission()
@@ -94,16 +94,81 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(this, PartSwapActivity::class.java)
             startActivity(intent)
         }
+
+        // Tap download card to retry on failure
+        binding.downloadCard.setOnClickListener {
+            if (!isDownloading && !ModelManager.areAllModelsAvailable(this)) {
+                startModelDownload()
+            }
+        }
     }
 
-    private fun checkModels() {
-        // Try to copy models from assets first
+    /**
+     * Check models at launch: try assets first, then auto-download if missing.
+     */
+    private fun checkAndDownloadModels() {
+        // Try to copy from assets (if bundled in APK)
         ModelManager.copyModelsFromAssets(this)
 
-        if (!ModelManager.areAllModelsAvailable(this)) {
-            showModelSetupDialog()
-        } else {
+        if (ModelManager.areAllModelsAvailable(this)) {
+            // Models already present, initialize pipeline
             initializePipeline()
+        } else {
+            // Auto-download missing models
+            startModelDownload()
+        }
+    }
+
+    /**
+     * Start downloading missing models with progress UI.
+     */
+    private fun startModelDownload() {
+        if (isDownloading) return
+        isDownloading = true
+
+        // Show download card
+        binding.downloadCard.visibility = View.VISIBLE
+        binding.downloadTitle.text = getString(R.string.downloading_models)
+        binding.downloadModelName.text = getString(R.string.first_launch_info)
+        binding.downloadProgressBar.progress = 0
+        binding.downloadPercentText.text = "0%"
+        binding.downloadSizeText.text = ""
+
+        val downloader = ModelDownloader(this)
+
+        lifecycleScope.launch {
+            val result = downloader.downloadMissingModels { progress ->
+                // Update UI (already on Main thread from ModelDownloader)
+                binding.downloadModelName.text = progress.modelName
+                binding.downloadProgressBar.progress = progress.overallPercent
+                binding.downloadPercentText.text = "${progress.overallPercent}%"
+                binding.downloadSizeText.text =
+                    "${progress.megabytesDownloaded} / ${progress.totalMegabytes} MB"
+            }
+
+            isDownloading = false
+
+            when (result) {
+                is ModelDownloader.DownloadResult.Success -> {
+                    binding.downloadTitle.text = getString(R.string.download_complete)
+                    binding.downloadModelName.text = ""
+                    binding.downloadProgressBar.progress = 100
+                    binding.downloadPercentText.text = "100%"
+
+                    // Hide download card after a short delay
+                    binding.downloadCard.postDelayed({
+                        binding.downloadCard.visibility = View.GONE
+                    }, 2000)
+
+                    // Initialize the pipeline now that models are available
+                    initializePipeline()
+                }
+                is ModelDownloader.DownloadResult.Error -> {
+                    binding.downloadTitle.text = getString(R.string.download_failed)
+                    binding.downloadModelName.text = result.message
+                    // Card stays visible so user can tap to retry
+                }
+            }
         }
     }
 
@@ -122,46 +187,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showModelSetupDialog() {
-        val missing = ModelManager.getMissingModels(this)
-        val message = buildString {
-            appendLine("The following AI models are required:\n")
-            for (model in missing) {
-                appendLine("  ${model.filename}")
-                appendLine("  ${model.description} (~${model.sizeMB} MB)")
-                appendLine("  ${model.downloadUrl}")
-                appendLine()
-            }
-            appendLine("Download the files and copy them to:")
-            appendLine("  ${ModelManager.getModelsDir(this@MainActivity).absolutePath}")
-            appendLine()
-            appendLine("Or copy to:")
-            appendLine("  Android/data/com.deeplivecam/files/models/")
-        }
-
-        AlertDialog.Builder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog)
-            .setTitle("Model Setup Required")
-            .setMessage(message)
-            .setPositiveButton("OK") { _, _ ->
-                // Check again after dialog
-                if (ModelManager.areAllModelsAvailable(this)) {
-                    initializePipeline()
-                }
-            }
-            .setNeutralButton("Check Again") { _, _ ->
-                ModelManager.copyModelsFromAssets(this)
-                if (ModelManager.areAllModelsAvailable(this)) {
-                    initializePipeline()
-                    Toast.makeText(this, "Models found!", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "Models still missing", Toast.LENGTH_SHORT).show()
-                    showModelSetupDialog()
-                }
-            }
-            .setCancelable(true)
-            .show()
-    }
-
     private fun loadSourceImage(uri: Uri) {
         lifecycleScope.launch {
             val bitmap = withContext(Dispatchers.IO) {
@@ -176,7 +201,6 @@ class MainActivity : AppCompatActivity() {
             binding.sourceImageView.visibility = View.VISIBLE
             binding.sourcePlaceholder.visibility = View.GONE
 
-            // Set source face in pipeline
             updateStatus("Detecting source face...")
             showProgress(true)
 
@@ -212,7 +236,6 @@ class MainActivity : AppCompatActivity() {
             binding.targetImageView.visibility = View.VISIBLE
             binding.targetPlaceholder.visibility = View.GONE
 
-            // Hide previous result
             hideResult()
         }
     }
@@ -223,7 +246,8 @@ class MainActivity : AppCompatActivity() {
         val currentPipeline = pipeline
         if (currentPipeline == null) {
             if (!ModelManager.areAllModelsAvailable(this)) {
-                showModelSetupDialog()
+                if (!isDownloading) startModelDownload()
+                Toast.makeText(this, "Models are downloading...", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this, "Models are still loading...", Toast.LENGTH_SHORT).show()
             }

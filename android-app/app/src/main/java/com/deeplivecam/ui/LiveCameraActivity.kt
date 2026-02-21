@@ -100,7 +100,7 @@ class LiveCameraActivity : AppCompatActivity() {
 
             val preview = Preview.Builder()
                 .build()
-                .also { it.surfaceProvider = binding.cameraPreview.surfaceProvider }
+                .also { it.setSurfaceProvider(binding.cameraPreview.surfaceProvider) }
 
             val imageAnalysis = ImageAnalysis.Builder()
                 .setTargetResolution(android.util.Size(640, 480))
